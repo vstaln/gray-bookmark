@@ -1,7 +1,16 @@
-# gray-bookmark
+<p align="center">
+  <img src="assets/gray-logo.svg" alt="gray" width="96">
+</p>
+<h1 align="center">gray-bookmark</h1>
+<p align="center">Named session markers you can `gray resume` around.</p>
+<p align="center">
+  <a href="https://github.com/vstaln/gray-bookmark/blob/main/LICENSE"><img alt="MIT License" src="https://img.shields.io/badge/license-MIT-blue.svg"></a>
+  <img alt="gray plugin" src="https://img.shields.io/badge/gray-plugin-7aa2f7.svg">
+  <img alt="rust" src="https://img.shields.io/badge/built%20with-rust-orange.svg">
+</p>
 
 Named markers you can `gray resume` around — `/bookmark` commands plus a
-`bookmark` tool. Port of pi's `bookmark` extension.
+`bookmark` tool.
 
 ## Commands
 
@@ -23,8 +32,8 @@ omitted.
 
 ## Honest note
 
-Pi's version labeled session entries for `/tree` navigation. Gray's sidecar
-wire has no session-entry label or fork/jump API — this stores named markers
+Gray's sidecar wire has no session-entry label or fork/jump API — this
+stores named markers
 (label + session id + cwd + timestamp) you can `gray resume` around, nothing
 more. It does not (cannot) rewind or jump the live session.
 
@@ -53,3 +62,7 @@ cargo test
 gray account check      # entry point + manifest handshake
 gray account publish    # check → build → release → publish to the gray registry
 ```
+
+---
+Part of the [gray](https://github.com/vstaln/gray) plugin ecosystem —
+the open-source AI agent harness. <https://gray.alignment.id>
