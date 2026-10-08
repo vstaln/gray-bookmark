@@ -7,7 +7,12 @@ Named markers you can `gray resume` around — `/bookmark` commands plus a
 
 - `/bookmark <label>` — mark where you are: appends `{label, session, cwd, ts}`
   to `~/.gray/bookmarks.jsonl`
-- `/bookmark` or `/bookmarks` — list all bookmarks (numbered)
+- `/bookmark` — with the `host.ask` capability granted, opens a "Jump
+  where?" picker (`<n> <label>` with session id, cwd and timestamp as each
+  option's description, plus "cancel"); picking one answers with `Resume
+  that session with: `gray resume <sid>` (cwd: <cwd>)`. With no ask
+  channel it falls back to the list.
+- `/bookmarks` — list all bookmarks (numbered)
 - `/bookmark rm <n>` — delete by 1-based index
 
 ## Tools
@@ -30,13 +35,15 @@ append-only, rewritten on remove.
 
 ## Wire methods
 
-`plugin/manifest`, `tool/call`, `command/run`, `plugin/shutdown`. Protocol 1.1.
-No capabilities, no host→sidecar requests.
+`plugin/manifest`, `tool/call`, `command/run`, `plugin/shutdown`, plus
+sidecar→host `host/ask` for the bare `/bookmark` picker. Protocol 1.1.
+Capability: `host.ask` (the command degrades to the text list without it).
 
 ## Install
 
 ```sh
 gray plugin install bookmark
+gray plugin capabilities bookmark --all   # grants host.ask → /bookmark picker
 ```
 
 ## Develop
