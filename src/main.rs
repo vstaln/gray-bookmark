@@ -46,6 +46,10 @@ fn manifest() -> Value {
             }
         }],
         "commands": ["/bookmark", "/bookmarks"],
+        "command_descriptions": {
+            "/bookmark": "mark this point in the session",
+            "/bookmarks": "list session bookmarks",
+        },
         "capabilities": ["host.ask"],
     })
 }
