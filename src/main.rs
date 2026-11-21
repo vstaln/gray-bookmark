@@ -163,7 +163,14 @@ fn fmt_ts(ts: i64) -> String {
     let d = doy - (153 * mp + 2) / 5 + 1;
     let m = if mp < 10 { mp + 3 } else { mp - 9 };
     let y = if m <= 2 { y + 1 } else { y };
-    format!("{:04}-{:02}-{:02} {:02}:{:02} UTC", y, m, d, secs / 3600, (secs % 3600) / 60)
+    format!(
+        "{:04}-{:02}-{:02} {:02}:{:02} UTC",
+        y,
+        m,
+        d,
+        secs / 3600,
+        (secs % 3600) / 60
+    )
 }
 
 fn render(marks: &[Value]) -> String {
@@ -180,7 +187,10 @@ fn render(marks: &[Value]) -> String {
                 m.get("label").and_then(Value::as_str).unwrap_or("?"),
                 m.get("cwd").and_then(Value::as_str).unwrap_or("?"),
                 m.get("session").and_then(Value::as_str).unwrap_or("?"),
-                m.get("ts").and_then(Value::as_i64).map(fmt_ts).unwrap_or_default(),
+                m.get("ts")
+                    .and_then(Value::as_i64)
+                    .map(fmt_ts)
+                    .unwrap_or_default(),
             )
         })
         .collect::<Vec<_>>()
@@ -223,7 +233,11 @@ fn call_tool(name: &str, args: &Value, params: &Value) -> Result<String, String>
 
 /// Picker label for bookmark `m` at 1-based index `i`.
 fn mark_label(i: usize, m: &Value) -> String {
-    format!("{} {}", i + 1, m.get("label").and_then(Value::as_str).unwrap_or("?"))
+    format!(
+        "{} {}",
+        i + 1,
+        m.get("label").and_then(Value::as_str).unwrap_or("?")
+    )
 }
 
 /// Bare `/bookmark` — "Jump where?" picker when host/ask works; cancel,
@@ -259,7 +273,11 @@ fn jump_or_list(ask: &mut Ask) -> String {
         "blocking": true,
     }));
     let label = picked_label(picked.as_ref(), Q_JUMP).unwrap_or_default();
-    match marks.iter().enumerate().find(|(i, m)| mark_label(*i, m) == label) {
+    match marks
+        .iter()
+        .enumerate()
+        .find(|(i, m)| mark_label(*i, m) == label)
+    {
         Some((_, m)) => format!(
             "Resume that session with: `gray resume {}` (cwd: {})",
             m.get("session").and_then(Value::as_str).unwrap_or("?"),
@@ -281,7 +299,11 @@ fn run_command(cmd: &str, argv: &[&str], params: &Value, ask: &mut Ask) -> Strin
             Err(_) => "usage: /bookmark rm <n>".into(),
         },
         ["rm"] | ["remove"] => "usage: /bookmark rm <n>".into(),
-        rest => match add(Some(&rest.join(" ")), session_id(params), &session_cwd(params)) {
+        rest => match add(
+            Some(&rest.join(" ")),
+            session_id(params),
+            &session_cwd(params),
+        ) {
             Ok(text) => text,
             Err(e) => e,
         },
@@ -343,7 +365,9 @@ fn main() -> std::io::Result<()> {
         let stdin = std::io::stdin();
         for line in stdin.lock().lines() {
             let Ok(line) = line else { break };
-            let Ok(v) = serde_json::from_str::<Value>(&line) else { continue };
+            let Ok(v) = serde_json::from_str::<Value>(&line) else {
+                continue;
+            };
             if let Some(id) = v.get("id").and_then(Value::as_str)
                 && v.get("method").is_none()
             {
@@ -429,7 +453,8 @@ mod tests {
     fn with_home(body: impl FnOnce(&std::path::Path)) {
         let _g = LOCK.lock().unwrap();
         let n = CTR.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-        let dir = std::env::temp_dir().join(format!("gray-bookmark-test-{}-{n}", std::process::id()));
+        let dir =
+            std::env::temp_dir().join(format!("gray-bookmark-test-{}-{n}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
         unsafe { std::env::set_var("GRAY_HOME", &dir) };
@@ -463,7 +488,10 @@ mod tests {
 
             // Bare /bookmark and /bookmarks list with 1-based numbers.
             for name in ["/bookmark", "/bookmarks"] {
-                let r = call("command/run", json!({"name": name, "argv": [], "session": sess()}));
+                let r = call(
+                    "command/run",
+                    json!({"name": name, "argv": [], "session": sess()}),
+                );
                 let text = r["result"]["text"].as_str().unwrap();
                 assert!(text.contains("#1 mark one"), "got: {text}");
                 assert!(text.contains("/tmp/proj") && text.contains("sess-1"));
@@ -475,8 +503,16 @@ mod tests {
                 json!({"name": "/bookmark", "argv": ["rm", "1"], "session": sess()}),
             );
             assert_eq!(r["result"]["text"], "Removed bookmark #1: mark one");
-            let r = call("command/run", json!({"name": "/bookmarks", "argv": [], "session": sess()}));
-            assert!(r["result"]["text"].as_str().unwrap().contains("No bookmarks"));
+            let r = call(
+                "command/run",
+                json!({"name": "/bookmarks", "argv": [], "session": sess()}),
+            );
+            assert!(
+                r["result"]["text"]
+                    .as_str()
+                    .unwrap()
+                    .contains("No bookmarks")
+            );
         });
     }
 
@@ -488,7 +524,12 @@ mod tests {
             assert_eq!(r["result"]["content"], "Bookmarked as: here");
             // Label optional → auto-generated.
             let r = call("tool/call", p(json!({"action": "add"})));
-            assert!(r["result"]["content"].as_str().unwrap().starts_with("Bookmarked as: bookmark-"));
+            assert!(
+                r["result"]["content"]
+                    .as_str()
+                    .unwrap()
+                    .starts_with("Bookmarked as: bookmark-")
+            );
 
             // JSONL on disk has the promised fields.
             let lines: Vec<Value> = std::fs::read_to_string(home.join("bookmarks.jsonl"))
@@ -506,10 +547,23 @@ mod tests {
             let text = r["result"]["content"].as_str().unwrap();
             assert!(text.contains("#1 here") && text.contains("#2 bookmark-"));
 
-            assert!(call("tool/call", p(json!({"action": "remove"})))["result"]["is_error"].as_bool().unwrap());
-            assert!(call("tool/call", p(json!({"action": "remove", "index": 9})))["result"]["is_error"].as_bool().unwrap());
+            assert!(
+                call("tool/call", p(json!({"action": "remove"})))["result"]["is_error"]
+                    .as_bool()
+                    .unwrap()
+            );
+            assert!(
+                call("tool/call", p(json!({"action": "remove", "index": 9})))["result"]["is_error"]
+                    .as_bool()
+                    .unwrap()
+            );
             let r = call("tool/call", p(json!({"action": "remove", "index": 2})));
-            assert!(r["result"]["content"].as_str().unwrap().starts_with("Removed bookmark #2"));
+            assert!(
+                r["result"]["content"]
+                    .as_str()
+                    .unwrap()
+                    .starts_with("Removed bookmark #2")
+            );
         });
     }
 
@@ -570,13 +624,21 @@ mod tests {
                 "command/run",
                 json!({"name": "/bookmark", "argv": [], "session": sess()}),
             );
-            assert!(r["result"]["text"].as_str().unwrap().contains("#1 mark one"));
+            assert!(
+                r["result"]["text"]
+                    .as_str()
+                    .unwrap()
+                    .contains("#1 mark one")
+            );
         });
     }
 
     #[test]
     fn shutdown_replies_then_exits() {
-        let (reply, exit) = handle(&json!({ "id": 2, "method": "plugin/shutdown" }), &mut |_p: &Value| None);
+        let (reply, exit) = handle(
+            &json!({ "id": 2, "method": "plugin/shutdown" }),
+            &mut |_p: &Value| None,
+        );
         assert!(reply.is_some() && exit);
     }
 }
