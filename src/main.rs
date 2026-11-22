@@ -111,12 +111,25 @@ fn now_ts() -> i64 {
         .unwrap_or(0)
 }
 
-fn load_all() -> Vec<Value> {
-    std::fs::read_to_string(store_path())
-        .unwrap_or_default()
-        .lines()
-        .filter(|l| !l.trim().is_empty())
-        .filter_map(|l| serde_json::from_str::<Value>(l).ok())
+fn load_all() -> Result<Vec<Value>, String> {
+    let path = store_path();
+    let text = match std::fs::read_to_string(&path) {
+        Ok(text) => text,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(Vec::new()),
+        Err(e) => return Err(format!("Error: could not read {}: {e}", path.display())),
+    };
+    text.lines()
+        .enumerate()
+        .filter(|(_, l)| !l.trim().is_empty())
+        .map(|(i, l)| {
+            serde_json::from_str::<Value>(l).map_err(|e| {
+                format!(
+                    "Error: could not parse {} line {}: {e}",
+                    path.display(),
+                    i + 1
+                )
+            })
+        })
         .collect()
 }
 
@@ -142,7 +155,7 @@ fn add(label: Option<&str>, session: &str, cwd: &str) -> Result<String, String> 
         .filter(|s| !s.is_empty())
         .map(String::from)
         .unwrap_or_else(|| format!("bookmark-{ts}"));
-    let mut marks = load_all();
+    let mut marks = load_all()?;
     marks.push(json!({"label": label, "session": session, "cwd": cwd, "ts": ts}));
     save_all(&marks).map_err(|e| format!("Error: could not save bookmark: {e}"))?;
     Ok(format!("Bookmarked as: {label}"))
@@ -201,7 +214,7 @@ fn remove(index: Option<i64>) -> Result<String, String> {
     let Some(n) = index else {
         return Err("Error: index required for remove (a 1-based number from list)".into());
     };
-    let mut marks = load_all();
+    let mut marks = load_all()?;
     if n < 1 || n as usize > marks.len() {
         return Err(format!("Bookmark #{n} not found"));
     }
@@ -220,7 +233,7 @@ fn call_tool(name: &str, args: &Value, params: &Value) -> Result<String, String>
         return Err(format!("unknown tool: {name}"));
     }
     match args.get("action").and_then(Value::as_str).unwrap_or("") {
-        "list" => Ok(render(&load_all())),
+        "list" => Ok(render(&load_all()?)),
         "add" => add(
             args.get("label").and_then(Value::as_str),
             session_id(params),
@@ -242,10 +255,10 @@ fn mark_label(i: usize, m: &Value) -> String {
 
 /// Bare `/bookmark` — "Jump where?" picker when host/ask works; cancel,
 /// timeout, or an ungranted capability falls back to the list render.
-fn jump_or_list(ask: &mut Ask) -> String {
-    let marks = load_all();
+fn jump_or_list(ask: &mut Ask) -> Result<String, String> {
+    let marks = load_all()?;
     if marks.is_empty() {
-        return render(&marks);
+        return Ok(render(&marks));
     }
     let mut options: Vec<Value> = marks
         .iter()
@@ -278,22 +291,22 @@ fn jump_or_list(ask: &mut Ask) -> String {
         .enumerate()
         .find(|(i, m)| mark_label(*i, m) == label)
     {
-        Some((_, m)) => format!(
+        Some((_, m)) => Ok(format!(
             "Resume that session with: `gray resume {}` (cwd: {})",
             m.get("session").and_then(Value::as_str).unwrap_or("?"),
             m.get("cwd").and_then(Value::as_str).unwrap_or("?"),
-        ),
-        None => render(&marks),
+        )),
+        None => Ok(render(&marks)),
     }
 }
 
 /// `/bookmark …` — `argv` excludes the command name.
 fn run_command(cmd: &str, argv: &[&str], params: &Value, ask: &mut Ask) -> String {
     if cmd == "/bookmarks" {
-        return render(&load_all());
+        return load_all().map(|m| render(&m)).unwrap_or_else(|e| e);
     }
     match argv {
-        [] => jump_or_list(ask),
+        [] => jump_or_list(ask).unwrap_or_else(|e| e),
         ["rm", n, ..] | ["remove", n, ..] => match n.parse::<i64>() {
             Ok(i) => remove(Some(i)).unwrap_or_else(|e| e),
             Err(_) => "usage: /bookmark rm <n>".into(),
